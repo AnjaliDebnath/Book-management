@@ -1,24 +1,33 @@
 const express = require('express');
 const router = express.Router();
 const Book= require("../models/books");
+const Author= require("../models/authors");
 
 //create a new book
-router.post('/',(req,res)=>{
-    const {title,author,genre,price}= req.body;
-    const newBook= new Book({title,author,genre,price});
-
-    newBook.save()
-    .then((newBook)=>{
-        res.json(newBook);
-    }).catch((err)=>{
-        console.log("error in post", err)
-    })
+router.post('/', async(req,res)=>{
+   try{
+        const book = new Book(req.body);
+        let author = await Author.findOne({name:book.author});
+        if(!author){
+            author = new Author({name:book.author, books:[book._id],});
+            await author.save();
+        }
+        else{
+            await Author.findOneAndUpdate({name:book.author},  {$addToSet:{book:book._id}}, {new:true})
+        }
+        const result= await book.save();
+        res.status(201).json(result);
+   }
+   catch(err){
+        console.error(err.message);
+        res.json({message: err.message})
+   }
 });
 
 //get all books
 router.get('/', async(req,res)=>{
     try{
-        const books= await Book.find({});
+        const books= await Book.find().populate('assignedTo', 'name email -_id');
         res.json(books)
     }
     catch(err){
